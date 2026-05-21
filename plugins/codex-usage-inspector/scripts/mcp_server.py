@@ -30,6 +30,10 @@ WIDGET_TEMPLATE_URI = "ui://widget/codex-usage-inspector.html"
 WIDGET_MIME_TYPE = "text/html+skybridge"
 DEFAULT_TOP_SESSIONS = 8
 DEFAULT_CACHE_TTL_SECONDS = 300
+WIDGET_DESCRIPTION = (
+    "Interactive dashboard for local Codex token usage, cache ratio, "
+    "top sessions, and API-equivalent cost comparisons."
+)
 
 
 class UsageCache:
@@ -55,14 +59,27 @@ def load_widget_html() -> str:
     return WIDGET_TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
-def tool_meta(invocation: str) -> dict[str, object]:
+def widget_resource_meta() -> dict[str, object]:
     return {
+        "openai/widgetDescription": WIDGET_DESCRIPTION,
+    }
+
+
+def render_tool_meta(invocation: str) -> dict[str, object]:
+    return {
+        "ui": {
+            "resourceUri": WIDGET_TEMPLATE_URI,
+        },
         "openai/outputTemplate": WIDGET_TEMPLATE_URI,
         "openai/toolInvocation/invoking": "正在整理 Codex token 用量面板",
         "openai/toolInvocation/invoked": "Codex token 面板已就绪",
         "openai/widgetAccessible": True,
         "invocation": invocation,
     }
+
+
+def tool_meta(invocation: str) -> dict[str, object]:
+    return render_tool_meta(invocation)
 
 
 def compact_dashboard_payload(raw_payload: dict) -> dict:
@@ -177,13 +194,18 @@ mcp = FastMCP(
     WIDGET_TEMPLATE_URI,
     name="Codex Usage Inspector widget",
     title="Codex Usage Inspector widget",
+    description=WIDGET_DESCRIPTION,
     mime_type=WIDGET_MIME_TYPE,
+    meta=widget_resource_meta(),
 )
 async def usage_widget_template() -> str:
     return load_widget_html()
 
 
-@mcp.tool()
+@mcp.tool(
+    description="Render the interactive Codex token usage dashboard inside Codex.",
+    meta=render_tool_meta("show_usage_dashboard"),
+)
 async def show_usage_dashboard(
     top_sessions: int = Field(default=DEFAULT_TOP_SESSIONS, ge=3, le=20, description="Top sessions shown in the widget."),
     force_refresh: bool = Field(default=False, description="Whether to bypass the in-memory cache and rescan local logs."),
@@ -209,7 +231,9 @@ async def show_usage_dashboard(
     )
 
 
-@mcp.tool()
+@mcp.tool(
+    description="Summarize Codex token usage for a requested time range.",
+)
 async def get_usage_summary(
     period: Literal["today", "yesterday", "last7", "this-month", "all"] = Field(
         default="this-month",

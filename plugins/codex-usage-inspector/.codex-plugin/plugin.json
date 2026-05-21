@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-inspector",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Inspect local Codex token usage, compare API-equivalent cost profiles, and launch a visual dashboard.",
   "author": {
     "name": "budoyh",
