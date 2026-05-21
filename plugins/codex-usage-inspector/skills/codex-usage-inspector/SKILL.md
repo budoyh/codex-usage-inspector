@@ -13,7 +13,7 @@ Use this plugin when the user wants a visual or exportable view of local Codex t
 - Deduplicates repeated sessions
 - Summarizes `input`, `cached input`, `non-cached input`, `output`, and `reasoning output`
 - Estimates API-equivalent cost for multiple pricing profiles
-- Renders an interactive widget directly inside Codex via MCP + Apps SDK metadata
+- Starts a local dashboard server and opens a Browser-friendly panel inside Codex
 
 ## Primary commands
 
@@ -35,8 +35,8 @@ python "plugins/codex-usage-inspector/scripts/token_usage_report.py" --month 202
 - Always state that the numbers come from local Codex logs, not official account billing.
 - Keep `reasoning_output_tokens` as an informative subset of `output_tokens`; do not add it a second time to cost.
 - If cached input dominates, say so explicitly and interpret it as repeated reuse of large conversation context.
-- If the user asks for a GUI or dashboard, prefer the in-Codex widget instead of pasting a long text table.
+- If the user asks for a GUI or dashboard, prefer the Browser-friendly local dashboard URL instead of pasting a long text table.
 
 ## Scope note
 
-This version provides a Codex widget experience and MCP tools. It still does not inject a permanent native token badge into the Codex desktop shell.
+This version provides a Browser-based local dashboard and MCP tools. It still does not inject a permanent native token badge into the Codex desktop shell.

@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-inspector",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "Inspect local Codex token usage, compare API-equivalent cost profiles, and launch a visual dashboard.",
   "author": {
     "name": "budoyh",
@@ -17,10 +17,11 @@
   ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
+  "apps": "./.app.json",
   "interface": {
     "displayName": "Codex Usage Inspector",
     "shortDescription": "Local token dashboard and cost estimates",
-    "longDescription": "Analyze local Codex session logs, compare pricing profiles, and render an interactive token dashboard directly inside Codex.",
+    "longDescription": "Analyze local Codex session logs, compare pricing profiles, and open a local token dashboard for Codex Browser workflows.",
     "developerName": "budoyh",
     "category": "Productivity",
     "capabilities": [
@@ -31,9 +32,9 @@
     "privacyPolicyURL": "https://github.com/budoyh/codex-usage-inspector#privacy",
     "termsOfServiceURL": "https://github.com/budoyh/codex-usage-inspector/blob/main/LICENSE",
     "defaultPrompt": [
-      "在 Codex 里打开我的 token 用量面板",
-      "对比 GPT-5.5 和 DeepSeek 的 API 等价成本",
-      "导出最近 7 天的 token 使用明细"
+      "Open my Codex token usage panel",
+      "Compare GPT-5.5 and DeepSeek cost",
+      "Export the last 7 days of token usage"
     ],
     "brandColor": "#0F766E",
     "screenshots": [

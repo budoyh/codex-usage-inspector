@@ -2,7 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import json
+import os
+import socket
+import subprocess
+import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -11,7 +20,6 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from usage_core import (
-    build_dashboard_payload,
     build_report,
     filter_records,
     load_records,
@@ -24,16 +32,14 @@ from usage_core import (
 )
 
 
-PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-WIDGET_TEMPLATE_PATH = PLUGIN_ROOT / "assets" / "usage-widget.html"
-WIDGET_TEMPLATE_URI = "ui://widget/codex-usage-inspector-v2.html"
-WIDGET_MIME_TYPE = "text/html;profile=mcp-app"
+SCRIPT_DIR = Path(__file__).resolve().parent
+PLUGIN_ROOT = SCRIPT_DIR.parent
+SERVE_SCRIPT = SCRIPT_DIR / "serve_dashboard.py"
 DEFAULT_TOP_SESSIONS = 8
 DEFAULT_CACHE_TTL_SECONDS = 300
-WIDGET_DESCRIPTION = (
-    "Interactive dashboard for local Codex token usage, cache ratio, "
-    "top sessions, and API-equivalent cost comparisons."
-)
+DEFAULT_BROWSER_HOST = "127.0.0.1"
+DEFAULT_BROWSER_PORT = 8765
+PORT_SCAN_LIMIT = 12
 
 
 class UsageCache:
@@ -45,101 +51,21 @@ class UsageCache:
 
     def get_records(self, force_refresh: bool = False):
         now = time.time()
-        if (
-            force_refresh
-            or self._records is None
-            or now - self._loaded_at > self.cache_ttl_seconds
-        ):
+        if force_refresh or self._records is None or now - self._loaded_at > self.cache_ttl_seconds:
             self._records = load_records(self.codex_home)
             self._loaded_at = now
         return self._records
 
 
-def load_widget_html() -> str:
-    return WIDGET_TEMPLATE_PATH.read_text(encoding="utf-8")
-
-
-def widget_resource_meta() -> dict[str, object]:
-    return {
-        "ui": {
-            "prefersBorder": True,
-            "csp": {
-                "connectDomains": [],
-                "resourceDomains": [],
-            },
-        },
-        "openai/widgetDescription": WIDGET_DESCRIPTION,
-    }
-
-
-def widget_resource() -> types.Resource:
-    return types.Resource(
-        name="Codex Usage Inspector widget",
-        title="Codex Usage Inspector widget",
-        uri=WIDGET_TEMPLATE_URI,
-        description=WIDGET_DESCRIPTION,
-        mimeType=WIDGET_MIME_TYPE,
-        _meta=widget_resource_meta(),
-    )
-
-
-def widget_contents() -> types.TextResourceContents:
-    return types.TextResourceContents(
-        uri=WIDGET_TEMPLATE_URI,
-        mimeType=WIDGET_MIME_TYPE,
-        text=load_widget_html(),
-        _meta=widget_resource_meta(),
-    )
-
-
-def render_tool_meta(invocation: str) -> dict[str, object]:
-    return {
-        "ui": {
-            "resourceUri": WIDGET_TEMPLATE_URI,
-        },
-        "openai/outputTemplate": WIDGET_TEMPLATE_URI,
-        "openai/toolInvocation/invoking": "正在整理 Codex token 用量面板",
-        "openai/toolInvocation/invoked": "Codex token 面板已就绪",
-        "openai/widgetAccessible": True,
-        "invocation": invocation,
-    }
-
-
-def tool_meta(invocation: str) -> dict[str, object]:
-    return render_tool_meta(invocation)
-
-
-def compact_dashboard_payload(raw_payload: dict) -> dict:
-    periods = {}
-    for key, period in raw_payload["periods"].items():
-        periods[key] = {
-            "key": period["key"],
-            "display_name": period["display_name"],
-            "range_start": period["range_start"],
-            "range_end": period["range_end"],
-            "summary": period["summary"],
-            "cost_estimate": period.get("cost_estimate"),
-            "cost_comparison": period["cost_comparison"],
-            "top_sessions": [
-                {
-                    "session_timestamp": session["session_timestamp"],
-                    "total_tokens": session["total_tokens"],
-                    "cached_input_ratio_pct": session["cached_input_ratio_pct"],
-                    "source": session["source"],
-                    "plan_type": session["plan_type"],
-                }
-                for session in period["top_sessions"]
-            ],
-        }
-
-    return {
-        "meta": {
-            **raw_payload["meta"],
-            "default_top_sessions": DEFAULT_TOP_SESSIONS,
-        },
-        "periods": periods,
-        "charts": raw_payload["charts"],
-    }
+def append_debug_log(codex_home: Path, message: str) -> None:
+    try:
+        log_path = codex_home / "codex-usage-inspector-debug.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().astimezone().isoformat()
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(f"{stamp} {message}\n")
+    except Exception:
+        pass
 
 
 def build_summary_payload(
@@ -158,11 +84,11 @@ def build_summary_payload(
         label = month
     elif from_date or to_date:
         if not from_date or not to_date:
-            raise ValueError("from_date 和 to_date 必须同时提供。")
+            raise ValueError("from_date and to_date must be provided together.")
         start_day = parse_day(from_date)
         end_day = parse_day(to_date)
         if end_day < start_day:
-            raise ValueError("to_date 不能早于 from_date。")
+            raise ValueError("to_date must be on or after from_date.")
         label = f"{start_day.isoformat()}..{end_day.isoformat()}"
     else:
         start_day, end_day, label = resolve_period_range(period, tzinfo)
@@ -170,7 +96,8 @@ def build_summary_payload(
     filtered = filter_records(records, start_day, end_day)
     pricing = normalize_pricing(price_profile)
     if pricing is None:
-        raise ValueError("price_profile 无效。")
+        raise ValueError("Invalid price_profile.")
+
     report = build_report(filtered, label, pricing=pricing, top_sessions=top_sessions)
     report["meta"] = {
         "price_profile": price_profile,
@@ -182,11 +109,167 @@ def build_summary_payload(
     return report
 
 
-def format_cached_ratio(summary: dict) -> str:
-    pct = summary.get("cached_input_ratio_pct")
-    if pct is None:
-        return "—"
-    return f"{pct}%"
+def dashboard_state_path(codex_home: Path) -> Path:
+    return codex_home / "codex-usage-inspector-browser.json"
+
+
+def load_dashboard_state(codex_home: Path) -> dict | None:
+    path = dashboard_state_path(codex_home)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def save_dashboard_state(codex_home: Path, payload: dict) -> None:
+    path = dashboard_state_path(codex_home)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def is_port_open(host: str, port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.5)
+        return sock.connect_ex((host, port)) == 0
+
+
+def request_ok(url: str, timeout: float = 1.5) -> bool:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            return 200 <= response.status < 300
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
+def dashboard_urls(host: str, port: int) -> tuple[str, str, str, str]:
+    base = f"http://{host}:{port}"
+    return f"{base}/dashboard", f"{base}/api/dashboard", f"{base}/healthz", f"{base}/warmup"
+
+
+def dashboard_server_healthy(host: str, port: int) -> bool:
+    _, _, health_url, _ = dashboard_urls(host, port)
+    return request_ok(health_url, timeout=1.0)
+
+
+def warmup_dashboard_server(host: str, port: int, force_refresh: bool) -> bool:
+    _, _, _, warmup_url = dashboard_urls(host, port)
+    query = urllib.parse.urlencode({"refresh": "1" if force_refresh else "0"})
+    return request_ok(f"{warmup_url}?{query}", timeout=240.0)
+
+
+def find_candidate_port(host: str) -> int:
+    for offset in range(PORT_SCAN_LIMIT):
+        port = DEFAULT_BROWSER_PORT + offset
+        if not is_port_open(host, port):
+            return port
+    raise RuntimeError("No free port found for the local dashboard.")
+
+
+def launch_dashboard_server(codex_home: Path, host: str, port: int, top_sessions: int) -> int:
+    log_path = codex_home / "codex-usage-inspector-browser-server.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_handle = log_path.open("a", encoding="utf-8")
+
+    cmd = [
+        sys.executable,
+        "-u",
+        str(SERVE_SCRIPT),
+        "--host",
+        host,
+        "--port",
+        str(port),
+        "--codex-home",
+        str(codex_home),
+        "--top-sessions",
+        str(top_sessions),
+    ]
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = (
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        )
+
+    process = subprocess.Popen(
+        cmd,
+        cwd=str(PLUGIN_ROOT),
+        stdout=log_handle,
+        stderr=log_handle,
+        stdin=subprocess.DEVNULL,
+        creationflags=creationflags,
+        close_fds=False if os.name == "nt" else True,
+    )
+    return process.pid
+
+
+def ensure_browser_dashboard(
+    codex_home: Path,
+    *,
+    top_sessions: int = DEFAULT_TOP_SESSIONS,
+    host: str = DEFAULT_BROWSER_HOST,
+    force_refresh: bool = False,
+) -> dict:
+    state = load_dashboard_state(codex_home)
+    if state:
+        saved_host = state.get("host") or host
+        saved_port = int(state.get("port") or DEFAULT_BROWSER_PORT)
+        if dashboard_server_healthy(saved_host, saved_port):
+            warmup_dashboard_server(saved_host, saved_port, force_refresh)
+            page_url, api_url, _, _ = dashboard_urls(saved_host, saved_port)
+            return {
+                "host": saved_host,
+                "port": saved_port,
+                "page_url": page_url,
+                "api_url": api_url,
+                "started": False,
+                "pid": state.get("pid"),
+            }
+
+    for offset in range(PORT_SCAN_LIMIT):
+        port = DEFAULT_BROWSER_PORT + offset
+        if dashboard_server_healthy(host, port):
+            warmup_dashboard_server(host, port, force_refresh)
+            page_url, api_url, _, _ = dashboard_urls(host, port)
+            save_dashboard_state(codex_home, {"host": host, "port": port, "pid": None})
+            return {
+                "host": host,
+                "port": port,
+                "page_url": page_url,
+                "api_url": api_url,
+                "started": False,
+                "pid": None,
+            }
+
+    port = find_candidate_port(host)
+    pid = launch_dashboard_server(codex_home, host, port, top_sessions)
+    page_url, api_url, _, _ = dashboard_urls(host, port)
+
+    deadline = time.time() + 30.0
+    while time.time() < deadline:
+        if dashboard_server_healthy(host, port):
+            if not warmup_dashboard_server(host, port, force_refresh):
+                raise RuntimeError(f"Dashboard server started but warmup failed at {page_url}.")
+            save_dashboard_state(codex_home, {"host": host, "port": port, "pid": pid})
+            return {
+                "host": host,
+                "port": port,
+                "page_url": page_url,
+                "api_url": api_url,
+                "started": True,
+                "pid": pid,
+            }
+        time.sleep(0.4)
+
+    raise RuntimeError(f"Dashboard server did not become ready at {page_url}.")
+
+
+def format_ratio(summary: dict) -> str:
+    ratio = summary.get("cached_input_ratio_pct")
+    if ratio is None:
+        return "-"
+    return f"{ratio:.2f}%"
 
 
 parser = argparse.ArgumentParser(description="Codex Usage Inspector MCP server.")
@@ -204,10 +287,14 @@ args, _ = parser.parse_known_args()
 
 codex_home = resolve_codex_home(args.codex_home)
 cache = UsageCache(codex_home=codex_home, cache_ttl_seconds=args.cache_ttl_seconds)
+append_debug_log(
+    codex_home,
+    f"server_start pid={os.getpid()} transport={args.transport} file={Path(__file__).resolve()} cwd={Path.cwd()}",
+)
 mcp = FastMCP(
     name="codex-usage-inspector",
     instructions=(
-        "Use show_usage_dashboard when the user wants a visual Codex token panel or pricing comparison. "
+        "Use show_usage_dashboard when the user wants a browser-based Codex token panel or pricing comparison. "
         "Use get_usage_summary when the user wants a direct numeric answer for a period."
     ),
     host=args.host,
@@ -217,53 +304,50 @@ mcp = FastMCP(
 )
 
 
-@mcp._mcp_server.list_resources()
-async def _list_resources() -> list[types.Resource]:
-    return [widget_resource()]
-
-
-async def _handle_read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
-    if str(req.params.uri) != WIDGET_TEMPLATE_URI:
-        return types.ServerResult(
-            types.ReadResourceResult(
-                contents=[],
-                _meta={"error": f"Unknown resource: {req.params.uri}"},
-            )
-        )
-
-    return types.ServerResult(
-        types.ReadResourceResult(contents=[widget_contents()])
-    )
-
-
-mcp._mcp_server.request_handlers[types.ReadResourceRequest] = _handle_read_resource
-
-
 @mcp.tool(
-    description="Render the interactive Codex token usage dashboard inside Codex.",
-    meta=render_tool_meta("show_usage_dashboard"),
+    description="Start the local token dashboard server and return a browser URL inside Codex.",
 )
 async def show_usage_dashboard(
-    top_sessions: int = Field(default=DEFAULT_TOP_SESSIONS, ge=3, le=20, description="Top sessions shown in the widget."),
-    force_refresh: bool = Field(default=False, description="Whether to bypass the in-memory cache and rescan local logs."),
+    top_sessions: int = Field(default=DEFAULT_TOP_SESSIONS, ge=3, le=20, description="Top sessions shown in the dashboard."),
+    force_refresh: bool = Field(default=False, description="Whether to bypass the in-memory cache and rescan local logs before reporting."),
 ) -> types.CallToolResult:
+    append_debug_log(
+        codex_home,
+        f"show_usage_dashboard top_sessions={top_sessions} force_refresh={force_refresh}",
+    )
     records = cache.get_records(force_refresh=force_refresh)
-    payload = build_dashboard_payload(
-        codex_home=codex_home,
-        records=records,
-        price_profile_name="gpt-5.5-standard",
+    summary_payload = build_summary_payload(
+        records,
+        period="this-month",
+        price_profile="gpt-5.5-standard",
         top_sessions=top_sessions,
     )
-    compact_payload = compact_dashboard_payload(payload)
+    dashboard = ensure_browser_dashboard(
+        codex_home,
+        top_sessions=top_sessions,
+        force_refresh=force_refresh,
+    )
+    summary = summary_payload["summary"]
+    cost = summary_payload.get("cost_estimate")
+    append_debug_log(
+        codex_home,
+        f"browser_dashboard_ready url={dashboard['page_url']} started={dashboard['started']} pid={dashboard['pid']}",
+    )
+    text = (
+        f"Browser dashboard ready: {dashboard['page_url']}\n"
+        f"This month: {summary['total_tokens']:,} tokens, cache ratio {format_ratio(summary)}, "
+        f"GPT-5.5 cost about {cost['total_cost']} {cost['currency']}."
+    )
     return types.CallToolResult(
-        content=[
-            types.TextContent(
-                type="text",
-                text="已渲染 Codex token 用量面板。数据来自本地 Codex 日志，不等同于官方账单。",
-            )
-        ],
-        structuredContent=compact_payload,
-        _meta=tool_meta("show_usage_dashboard"),
+        content=[types.TextContent(type="text", text=text)],
+        structuredContent={
+            "dashboard_url": dashboard["page_url"],
+            "dashboard_api_url": dashboard["api_url"],
+            "started_server": dashboard["started"],
+            "summary": summary,
+            "cost_estimate": cost,
+            "source": "local_codex_logs",
+        },
         isError=False,
     )
 
@@ -296,6 +380,14 @@ async def get_usage_summary(
     top_sessions: int = Field(default=5, ge=1, le=20, description="How many top sessions to include."),
     force_refresh: bool = Field(default=False, description="Whether to bypass the in-memory cache and rescan local logs."),
 ) -> types.CallToolResult:
+    append_debug_log(
+        codex_home,
+        (
+            f"get_usage_summary period={period} month={month} from_date={from_date} "
+            f"to_date={to_date} price_profile={price_profile} top_sessions={top_sessions} "
+            f"force_refresh={force_refresh}"
+        ),
+    )
     records = cache.get_records(force_refresh=force_refresh)
     payload = build_summary_payload(
         records,
@@ -309,10 +401,10 @@ async def get_usage_summary(
     summary = payload["summary"]
     cost = payload["cost_estimate"]
     text = (
-        f"{summary['label']}：总 token {summary['total_tokens']:,}，"
-        f"输入 {summary['input_tokens']:,}，缓存输入 {summary['cached_input_tokens']:,}，"
-        f"输出 {summary['output_tokens']:,}，缓存占比 {format_cached_ratio(summary)}，"
-        f"{cost['display_name']} 等价成本约 {cost['total_cost']} {cost['currency']}。"
+        f"{summary['label']}: total tokens {summary['total_tokens']:,}, "
+        f"input {summary['input_tokens']:,}, cached input {summary['cached_input_tokens']:,}, "
+        f"output {summary['output_tokens']:,}, cache ratio {format_ratio(summary)}, "
+        f"{cost['display_name']} cost about {cost['total_cost']} {cost['currency']}."
     )
     return types.CallToolResult(
         content=[types.TextContent(type="text", text=text)],

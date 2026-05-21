@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -51,11 +51,15 @@
         padding: 14px;
       }
 
-      .topbar {
+      .topbar,
+      .section-head {
         display: flex;
         justify-content: space-between;
         gap: 12px;
-        align-items: start;
+        align-items: flex-start;
+      }
+
+      .topbar {
         margin-bottom: 14px;
       }
 
@@ -78,9 +82,20 @@
         margin-bottom: 8px;
       }
 
+      h2 {
+        font-size: 17px;
+      }
+
       .subhead,
-      .muted {
+      .muted,
+      .detail,
+      .sub {
         color: var(--muted);
+      }
+
+      .subhead,
+      .muted,
+      .detail {
         line-height: 1.45;
       }
 
@@ -112,18 +127,6 @@
         margin-top: 14px;
       }
 
-      .section-head {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        align-items: end;
-        margin-bottom: 10px;
-      }
-
-      .section-head h2 {
-        font-size: 17px;
-      }
-
       .period-grid,
       .metrics-grid,
       .cost-grid {
@@ -143,7 +146,14 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
-      .card {
+      .charts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .card,
+      .chart-box {
         background: var(--panel-2);
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -168,26 +178,6 @@
         font-size: 18px;
         line-height: 1.1;
         margin-bottom: 6px;
-      }
-
-      .detail {
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.35;
-      }
-
-      .charts {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .chart-box {
-        background: var(--panel-2);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 12px;
-        min-width: 0;
       }
 
       .bars {
@@ -247,7 +237,6 @@
       .sub {
         display: block;
         margin-top: 4px;
-        color: var(--muted);
         font-size: 12px;
       }
 
@@ -277,7 +266,7 @@
         .topbar,
         .section-head {
           flex-direction: column;
-          align-items: start;
+          align-items: flex-start;
         }
       }
 
@@ -294,26 +283,25 @@
         <div class="topbar">
           <div>
             <p class="eyebrow">Codex Usage Inspector</p>
-            <h1>本地 token 用量面板</h1>
-            <p class="subhead">读取本地 Codex 日志并在对话内渲染，不依赖外部网页。</p>
+            <h1>Local token dashboard</h1>
+            <p class="subhead">Read local Codex logs and render the dashboard directly inside Codex.</p>
           </div>
           <div class="actions">
-            <button id="fullscreen-button" type="button">全屏</button>
-            <button id="refresh-button" class="primary" type="button">刷新</button>
+            <button id="refresh-button" class="primary" type="button">Refresh</button>
           </div>
         </div>
 
         <div class="section">
           <div class="section-head">
-            <h2>时间范围</h2>
-            <p id="meta-line" class="muted">正在等待工具结果…</p>
+            <h2>Periods</h2>
+            <p id="meta-line" class="muted">Waiting for tool output...</p>
           </div>
           <div id="period-grid" class="period-grid"></div>
         </div>
 
         <div class="section">
           <div class="section-head">
-            <h2 id="summary-title">概览</h2>
+            <h2 id="summary-title">Summary</h2>
             <p id="range-line" class="muted"></p>
           </div>
           <div id="metrics-grid" class="metrics-grid"></div>
@@ -321,24 +309,24 @@
 
         <div class="section">
           <div class="section-head">
-            <h2>成本换算</h2>
-            <p class="muted">同一批 token 在不同 API 价格档下的等价成本。</p>
+            <h2>Cost comparison</h2>
+            <p class="muted">Equivalent API cost for the same token volume.</p>
           </div>
           <div id="cost-grid" class="cost-grid"></div>
         </div>
 
         <div class="section">
           <div class="section-head">
-            <h2>趋势</h2>
-            <p class="muted">最近 30 天与全历史按月趋势。</p>
+            <h2>Trends</h2>
+            <p class="muted">Last 30 days and monthly history.</p>
           </div>
           <div class="charts">
             <div class="chart-box">
-              <div class="label">最近 30 天</div>
+              <div class="label">Last 30 days</div>
               <div id="daily-chart"></div>
             </div>
             <div class="chart-box">
-              <div class="label">月份趋势</div>
+              <div class="label">Monthly</div>
               <div id="monthly-chart"></div>
             </div>
           </div>
@@ -346,17 +334,17 @@
 
         <div class="section">
           <div class="section-head">
-            <h2>Top Sessions</h2>
-            <p class="muted">当前所选时间范围内最耗 token 的会话。</p>
+            <h2>Top sessions</h2>
+            <p class="muted">Highest token sessions in the selected period.</p>
           </div>
           <div id="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>时间</th>
-                  <th>总 token</th>
-                  <th>缓存占比</th>
-                  <th>来源</th>
+                  <th>Time</th>
+                  <th>Total tokens</th>
+                  <th>Cached ratio</th>
+                  <th>Source</th>
                 </tr>
               </thead>
               <tbody id="sessions-body"></tbody>
@@ -368,11 +356,14 @@
 
     <script>
       const DEFAULT_PERIOD = "this-month";
-      const numberFormat = new Intl.NumberFormat("zh-CN");
+      const numberFormat = new Intl.NumberFormat("en-US");
       const state = {
         payload: null,
         selectedPeriod: DEFAULT_PERIOD,
         refreshPending: false,
+        rpcId: 0,
+        pending: new Map(),
+        bridgeReady: false,
       };
 
       function formatInt(value) {
@@ -381,16 +372,16 @@
 
       function formatPct(value) {
         if (value === null || value === undefined) {
-          return "—";
+          return "--";
         }
         return `${Number(value).toFixed(2)}%`;
       }
 
       function formatUsd(cost) {
         if (!cost) {
-          return "—";
+          return "--";
         }
-        const amount = Number(cost.total_cost || 0).toLocaleString("zh-CN", {
+        const amount = Number(cost.total_cost || 0).toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
@@ -399,10 +390,10 @@
 
       function formatTime(value) {
         if (!value) {
-          return "—";
+          return "--";
         }
         try {
-          return new Date(value).toLocaleString("zh-CN");
+          return new Date(value).toLocaleString();
         } catch {
           return value;
         }
@@ -434,7 +425,7 @@
 
       function render() {
         if (!state.payload) {
-          document.getElementById("meta-line").textContent = "正在等待工具结果…";
+          document.getElementById("meta-line").textContent = "Waiting for tool output...";
           return;
         }
         renderMeta();
@@ -449,7 +440,7 @@
       function renderMeta() {
         const meta = state.payload.meta;
         document.getElementById("meta-line").textContent =
-          `最近刷新 ${formatTime(meta.generated_at)} · 已解析 ${formatInt(meta.record_count)} 个会话 · 本地日志口径`;
+          `Refreshed ${formatTime(meta.generated_at)} | Parsed ${formatInt(meta.record_count)} sessions | Local log view`;
       }
 
       function renderPeriods() {
@@ -462,7 +453,7 @@
           button.innerHTML = `
             <div class="label">${period.display_name}</div>
             <div class="value">${formatInt(period.summary.total_tokens)}</div>
-            <div class="detail">${formatUsd(period.cost_estimate)} · ${formatPct(period.summary.cached_input_ratio_pct)}</div>
+            <div class="detail">${formatUsd(period.cost_estimate)} | ${formatPct(period.summary.cached_input_ratio_pct)}</div>
           `;
           button.addEventListener("click", () => {
             state.selectedPeriod = period.key;
@@ -476,17 +467,17 @@
       function renderMetrics() {
         const period = state.payload.periods[state.selectedPeriod];
         const summary = period.summary;
-        document.getElementById("summary-title").textContent = `${period.display_name}概览`;
+        document.getElementById("summary-title").textContent = `${period.display_name} summary`;
         document.getElementById("range-line").textContent =
-          `${period.range_start || "起始未限制"} - ${period.range_end || "至今"}`;
+          `${period.range_start || "unbounded start"} - ${period.range_end || "present"}`;
 
         const metrics = [
-          ["总 token", formatInt(summary.total_tokens), formatUsd(period.cost_estimate)],
-          ["会话数", formatInt(summary.session_count), `Top sessions ${period.top_sessions.length}`],
-          ["输入 token", formatInt(summary.input_tokens), `缓存 ${formatInt(summary.cached_input_tokens)}`],
-          ["非缓存输入", formatInt(summary.non_cached_input_tokens), "更接近真实新增输入"],
-          ["输出 token", formatInt(summary.output_tokens), `reasoning ${formatInt(summary.reasoning_output_tokens)}`],
-          ["缓存占比", formatPct(summary.cached_input_ratio_pct), "上下文复用强度"],
+          ["Total tokens", formatInt(summary.total_tokens), formatUsd(period.cost_estimate)],
+          ["Sessions", formatInt(summary.session_count), `Top sessions ${period.top_sessions.length}`],
+          ["Input tokens", formatInt(summary.input_tokens), `Cached ${formatInt(summary.cached_input_tokens)}`],
+          ["Non-cached input", formatInt(summary.non_cached_input_tokens), "Closer to fresh prompt volume"],
+          ["Output tokens", formatInt(summary.output_tokens), `Reasoning ${formatInt(summary.reasoning_output_tokens)}`],
+          ["Cached ratio", formatPct(summary.cached_input_ratio_pct), "Conversation reuse intensity"],
         ];
 
         const grid = document.getElementById("metrics-grid");
@@ -513,7 +504,7 @@
           div.innerHTML = `
             <div class="label">${cost.display_name}</div>
             <div class="value">${formatUsd(cost)}</div>
-            <div class="detail">输入 ${cost.input_cost} / 缓存 ${cost.cached_input_cost} / 输出 ${cost.output_cost}</div>
+            <div class="detail">Input ${cost.input_cost} / Cached ${cost.cached_input_cost} / Output ${cost.output_cost}</div>
           `;
           grid.appendChild(div);
         });
@@ -523,7 +514,7 @@
         const container = document.getElementById(containerId);
         container.innerHTML = "";
         if (!rows || !rows.length) {
-          container.innerHTML = '<div class="status">没有可显示的数据</div>';
+          container.innerHTML = '<div class="status">No chart data available.</div>';
           return;
         }
         const max = Math.max(...rows.map((row) => row.total_tokens), 1);
@@ -551,7 +542,7 @@
         body.innerHTML = "";
         const period = state.payload.periods[state.selectedPeriod];
         if (!period.top_sessions.length) {
-          body.innerHTML = '<tr><td colspan="4" class="empty">这个时间范围内没有会话数据。</td></tr>';
+          body.innerHTML = '<tr><td colspan="4" class="empty">No session data in this period.</td></tr>';
           return;
         }
         period.top_sessions.forEach((session) => {
@@ -566,34 +557,63 @@
         });
       }
 
-      async function refreshDashboard(force) {
-        if (!window.openai || typeof window.openai.callTool !== "function" || state.refreshPending) {
+      function rpcNotify(method, params) {
+        window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
+      }
+
+      function rpcRequest(method, params) {
+        return new Promise((resolve, reject) => {
+          const id = ++state.rpcId;
+          state.pending.set(id, { resolve, reject });
+          window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+        });
+      }
+
+      function handleBridgeToolResult(message) {
+        const params = message && message.params;
+        if (!params) {
           return;
         }
-        state.refreshPending = true;
-        document.getElementById("meta-line").textContent = "正在刷新本地日志数据…";
-        try {
-          const result = await window.openai.callTool("show_usage_dashboard", {
-            top_sessions: state.payload?.meta?.default_top_sessions || 8,
-            force_refresh: Boolean(force),
-          });
-          if (result && result.structuredContent) {
-            applyPayload(result.structuredContent);
+        if (params.structuredContent && params.structuredContent.periods) {
+          applyPayload(params.structuredContent);
+        }
+      }
+
+      window.addEventListener(
+        "message",
+        (event) => {
+          if (event.source !== window.parent) {
+            return;
           }
-        } catch (error) {
-          document.getElementById("meta-line").textContent = `刷新失败: ${error?.message || error}`;
-        } finally {
-          state.refreshPending = false;
-        }
-      }
 
-      function tryFullscreen() {
-        if (window.openai && typeof window.openai.requestDisplayMode === "function") {
-          window.openai.requestDisplayMode({ mode: "fullscreen" }).catch(() => {});
-        }
-      }
+          const message = event.data;
+          if (!message || message.jsonrpc !== "2.0") {
+            return;
+          }
 
-      function handleGlobals(globals) {
+          if (typeof message.id === "number") {
+            const pending = state.pending.get(message.id);
+            if (!pending) {
+              return;
+            }
+            state.pending.delete(message.id);
+            if (message.error) {
+              pending.reject(message.error);
+              return;
+            }
+            pending.resolve(message.result);
+            return;
+          }
+
+          if (message.method === "ui/notifications/tool-result") {
+            handleBridgeToolResult(message);
+          }
+        },
+        { passive: true }
+      );
+
+      window.addEventListener("openai:set_globals", (event) => {
+        const globals = event.detail && event.detail.globals;
         if (!globals) {
           return;
         }
@@ -607,40 +627,79 @@
         if (globals.toolOutput && globals.toolOutput.periods) {
           applyPayload(globals.toolOutput);
         }
+      });
+
+      async function initializeBridge() {
+        try {
+          await rpcRequest("ui/initialize", {
+            appInfo: { name: "codex-usage-inspector-widget", version: "0.1.2" },
+            appCapabilities: {},
+            protocolVersion: "2026-01-26",
+          });
+          rpcNotify("ui/notifications/initialized", {});
+          state.bridgeReady = true;
+        } catch (error) {
+          document.getElementById("meta-line").textContent = `Bridge init failed: ${error && error.message ? error.message : error}`;
+        }
       }
 
-      window.addEventListener("openai:set_globals", (event) => {
-        handleGlobals(event.detail && event.detail.globals);
-      });
+      async function refreshDashboard(force) {
+        if (state.refreshPending) {
+          return;
+        }
+        state.refreshPending = true;
+        document.getElementById("meta-line").textContent = "Refreshing local log data...";
+        try {
+          if (window.openai && typeof window.openai.callTool === "function") {
+            const result = await window.openai.callTool("show_usage_dashboard", {
+              top_sessions: state.payload && state.payload.meta ? state.payload.meta.default_top_sessions || 8 : 8,
+              force_refresh: Boolean(force),
+            });
+            if (result && result.structuredContent) {
+              applyPayload(result.structuredContent);
+            }
+          } else {
+            const result = await rpcRequest("tools/call", {
+              name: "show_usage_dashboard",
+              arguments: {
+                top_sessions: state.payload && state.payload.meta ? state.payload.meta.default_top_sessions || 8 : 8,
+                force_refresh: Boolean(force),
+              },
+            });
+            if (result && result.structuredContent) {
+              applyPayload(result.structuredContent);
+            }
+          }
+        } catch (error) {
+          document.getElementById("meta-line").textContent = `Refresh failed: ${error && error.message ? error.message : error}`;
+        } finally {
+          state.refreshPending = false;
+        }
+      }
 
       document.getElementById("refresh-button").addEventListener("click", () => {
         refreshDashboard(true);
       });
-      document.getElementById("fullscreen-button").addEventListener("click", () => {
-        tryFullscreen();
-      });
 
-      function boot() {
-        if (window.openai) {
-          setTheme(window.openai.theme);
-          handleGlobals({
-            toolOutput: window.openai.toolOutput,
-            widgetState: window.openai.widgetState,
-            theme: window.openai.theme,
-          });
+      function bootFromWindowOpenAI() {
+        if (!window.openai) {
+          return false;
+        }
+        setTheme(window.openai.theme);
+        if (window.openai.toolOutput && window.openai.toolOutput.periods) {
+          applyPayload(window.openai.toolOutput);
+        }
+        return true;
+      }
+
+      async function boot() {
+        await initializeBridge();
+        if (!bootFromWindowOpenAI()) {
+          document.getElementById("meta-line").textContent = "Bridge initialized. Waiting for tool result...";
         }
       }
 
-      let checks = 0;
-      const intervalId = window.setInterval(() => {
-        checks += 1;
-        boot();
-        if (window.openai || checks >= 40) {
-          window.clearInterval(intervalId);
-        }
-      }, 250);
       boot();
     </script>
   </body>
 </html>
-

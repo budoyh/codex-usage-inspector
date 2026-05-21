@@ -1,102 +1,122 @@
 # codex-usage-inspector
 
-一个面向 Codex 本地日志的 token 用量分析插件仓库。当前版本包含：
-
-- Codex 插件骨架
-- 可复用的 Python 统计核心
-- Codex 内嵌 MCP widget
-- 文本报告 CLI
-- GPT-5.5 / DeepSeek V4 Pro / DeepSeek V4 Flash 的 API 等价成本换算
+Inspect local Codex token usage, compare API-equivalent pricing, and open a local Browser dashboard from inside Codex.
 
 ![dashboard preview](plugins/codex-usage-inspector/assets/dashboard-preview.png)
 
-## 快速开始
+## What this plugin provides
 
-### 作为 Codex 插件使用
+- MCP tools for token usage summaries
+- A Browser-friendly local dashboard served from your machine
+- Cost estimates for `GPT-5.5`, `DeepSeek V4 Pro (Discounted)`, and `DeepSeek V4 Flash (Discounted)`
+- A CLI report generator for JSON, CSV, and Markdown exports
 
-插件 MCP server 配置在：
+## Current UX
 
-- [plugins/codex-usage-inspector/.mcp.json](plugins/codex-usage-inspector/.mcp.json)
+This version does **not** inject a permanent native badge into the Codex desktop shell.
 
-核心入口：
+Instead, it does two things:
 
-- [plugins/codex-usage-inspector/scripts/mcp_server.py](plugins/codex-usage-inspector/scripts/mcp_server.py)
+1. `get_usage_summary` returns direct numeric answers for a time range
+2. `show_usage_dashboard` starts a local dashboard server and returns a local URL such as `http://127.0.0.1:8765/dashboard`
 
-依赖安装：
+That URL is meant to be opened in Codex's Browser surface.
+
+## Install and run
+
+### Plugin files
+
+- MCP config: [plugins/codex-usage-inspector/.mcp.json](plugins/codex-usage-inspector/.mcp.json)
+- Plugin manifest: [plugins/codex-usage-inspector/.codex-plugin/plugin.json](plugins/codex-usage-inspector/.codex-plugin/plugin.json)
+- MCP entrypoint: [plugins/codex-usage-inspector/scripts/mcp_server.py](plugins/codex-usage-inspector/scripts/mcp_server.py)
+
+### Dependencies
 
 ```bash
 python -m pip install -r "plugins/codex-usage-inspector/requirements.txt"
 ```
 
-插件内主工具：
+### MCP tools
 
 - `show_usage_dashboard`
 - `get_usage_summary`
 
-### 调试模式
+### Local HTTP debugging
 
-如果你想单独本地调 MCP HTTP 端点：
+Run the MCP server directly:
 
 ```bash
 python "plugins/codex-usage-inspector/scripts/mcp_server.py" --transport streamable-http --port 8766
 ```
 
-MCP HTTP 端点：
+MCP endpoint:
 
-- `http://127.0.0.1:8766/mcp`
+- [http://127.0.0.1:8766/mcp](http://127.0.0.1:8766/mcp)
 
-纯文本统计：
+Run the standalone Browser dashboard server:
+
+```bash
+python "plugins/codex-usage-inspector/scripts/serve_dashboard.py" --host 127.0.0.1 --port 8765
+```
+
+Dashboard URL:
+
+- [http://127.0.0.1:8765/dashboard](http://127.0.0.1:8765/dashboard)
+
+### CLI reports
 
 ```bash
 python "plugins/codex-usage-inspector/scripts/token_usage_report.py" --period this-month --json
 python "plugins/codex-usage-inspector/scripts/token_usage_report.py" --period last7 --price-profile deepseek-v4-pro-discounted --json
 ```
 
-## 目录结构
+## Repository layout
 
 ```text
 .
-├─ .agents/plugins/marketplace.json
-├─ plugins/codex-usage-inspector/
-│  ├─ .codex-plugin/plugin.json
-│  ├─ .mcp.json
-│  ├─ requirements.txt
-│  ├─ skills/codex-usage-inspector/SKILL.md
-│  ├─ scripts/
-│  │  ├─ usage_core.py
-│  │  ├─ mcp_server.py
-│  │  ├─ token_usage_report.py
-│  │  └─ serve_dashboard.py
-│  ├─ assets/
-│  │  ├─ usage-widget.html
-│  │  └─ dashboard-preview.png
-│  └─ web/
-│     ├─ index.html
-│     ├─ app.css
-│     └─ app.js
-└─ LICENSE
+|-- .agents/plugins/marketplace.json
+|-- plugins/codex-usage-inspector/
+|   |-- .app.json
+|   |-- .codex-plugin/plugin.json
+|   |-- .mcp.json
+|   |-- requirements.txt
+|   |-- skills/codex-usage-inspector/SKILL.md
+|   |-- scripts/
+|   |   |-- usage_core.py
+|   |   |-- mcp_server.py
+|   |   |-- serve_dashboard.py
+|   |   `-- token_usage_report.py
+|   |-- assets/
+|   |   |-- dashboard-preview.png
+|   |   `-- usage-widget.html
+|   `-- web/
+|       |-- app.css
+|       |-- app.js
+|       `-- index.html
+`-- LICENSE
 ```
 
-## 数据口径
+## Data model
 
-- 只读取本地 Codex 日志：`sessions/` 和 `archived_sessions/`
-- 同一会话去重后只保留最终有效 token 快照
-- `reasoning_output_tokens` 视为 `output_tokens` 的子集，不重复计费
-- 这是本地日志口径，不等于 OpenAI 或 DeepSeek 官方账单
+- Reads only local Codex logs from `sessions/` and `archived_sessions/`
+- Deduplicates repeated sessions
+- Keeps only the final valid `token_count` snapshot per session
+- Treats `reasoning_output_tokens` as a subset of `output_tokens`
+- Reports local-log totals, not official vendor billing totals
 
-## 运行说明
+## Performance notes
 
-- `show_usage_dashboard` 会在 Codex 里直接渲染 widget，不需要再跳去浏览器网站
-- 首次扫描大量本地日志可能需要几十秒
-- MCP server 带 300 秒内存缓存，后续刷新通常会快很多
+- First warmup can take minutes if your local log history is large
+- The Browser dashboard now warms the heavy report before returning the URL
+- Dashboard payloads and parsed records are cached in memory for faster follow-up views
 
-## 定价来源
+## Pricing sources
 
-- OpenAI GPT-5.5 标准价：[OpenAI API Pricing](https://openai.com/api/pricing/)
-- DeepSeek V4 Pro / Flash 折扣价：[DeepSeek Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing/)
+- OpenAI GPT-5.5 standard API pricing: [OpenAI API Pricing](https://openai.com/api/pricing/)
+- DeepSeek V4 pricing: [DeepSeek Pricing](https://api-docs.deepseek.com/quick_start/pricing/)
 
-后续如果官方改价，需要同步更新 `plugins/codex-usage-inspector/scripts/usage_core.py` 里的 `PRICING_PROFILES`。
+If official pricing changes, update `PRICING_PROFILES` in [plugins/codex-usage-inspector/scripts/usage_core.py](plugins/codex-usage-inspector/scripts/usage_core.py).
 
 ## Privacy
 
-这个插件的第一版只读取本机日志文件，不联网读取账单，不上传日志内容。价格换算只是基于本地聚合结果做的静态估算。
+This plugin reads local Codex log files only. It does not fetch your vendor billing account and does not upload your log contents.
