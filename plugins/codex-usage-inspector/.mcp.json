@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "codex-usage-inspector": {
+      "command": "python",
+      "args": [
+        "-u",
+        "./scripts/mcp_server.py"
+      ],
+      "cwd": ".",
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}
+

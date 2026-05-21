@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex Usage Inspector</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0f1415;
+        --panel: #151b1c;
+        --panel-2: #1b2325;
+        --border: #2a3537;
+        --text: #eef5f5;
+        --muted: #9db0b3;
+        --accent: #2dd4bf;
+        --accent-2: #f59e0b;
+      }
+
+      :root[data-theme="light"] {
+        color-scheme: light;
+        --bg: #f5f8f8;
+        --panel: #ffffff;
+        --panel-2: #f3f7f7;
+        --border: #d8e1e3;
+        --text: #0f1720;
+        --muted: #54656a;
+        --accent: #0f766e;
+        --accent-2: #d97706;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        padding: 12px;
+      }
+
+      .shell {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+        margin-bottom: 14px;
+      }
+
+      .eyebrow {
+        margin: 0 0 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+        line-height: 1.08;
+        margin-bottom: 8px;
+      }
+
+      .subhead,
+      .muted {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      button {
+        appearance: none;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--text);
+        border-radius: 8px;
+        min-height: 38px;
+        padding: 0 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button.primary {
+        background: #0f766e;
+        border-color: #0f766e;
+        color: #fff;
+      }
+
+      .section {
+        margin-top: 14px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 10px;
+      }
+
+      .section-head h2 {
+        font-size: 17px;
+      }
+
+      .period-grid,
+      .metrics-grid,
+      .cost-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .period-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+
+      .metrics-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .cost-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .card {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+      }
+
+      .period-card {
+        cursor: pointer;
+      }
+
+      .period-card.active {
+        border-color: var(--accent);
+      }
+
+      .label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 8px;
+      }
+
+      .value {
+        font-size: 18px;
+        line-height: 1.1;
+        margin-bottom: 6px;
+      }
+
+      .detail {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .charts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .chart-box {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        min-width: 0;
+      }
+
+      .bars {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
+        gap: 5px;
+        align-items: end;
+        min-height: 170px;
+        margin-top: 8px;
+      }
+
+      .bar-item {
+        display: grid;
+        gap: 6px;
+        align-items: end;
+        justify-items: center;
+      }
+
+      .bar {
+        width: 100%;
+        border-radius: 5px 5px 0 0;
+        background: linear-gradient(180deg, var(--accent), #0d9488);
+        min-height: 2px;
+      }
+
+      .bar.warn {
+        background: linear-gradient(180deg, var(--accent-2), #d97706);
+      }
+
+      .bar-label {
+        font-size: 10px;
+        color: var(--muted);
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        max-height: 72px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 10px 8px;
+        border-bottom: 1px solid var(--border);
+        font-size: 13px;
+        vertical-align: top;
+      }
+
+      th {
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .sub {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--muted);
+      }
+
+      .empty {
+        color: var(--muted);
+      }
+
+      @media (max-width: 880px) {
+        .period-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .metrics-grid,
+        .cost-grid,
+        .charts {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .section-head {
+          flex-direction: column;
+          align-items: start;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .period-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="shell">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow">Codex Usage Inspector</p>
+            <h1>本地 token 用量面板</h1>
+            <p class="subhead">读取本地 Codex 日志并在对话内渲染，不依赖外部网页。</p>
+          </div>
+          <div class="actions">
+            <button id="fullscreen-button" type="button">全屏</button>
+            <button id="refresh-button" class="primary" type="button">刷新</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>时间范围</h2>
+            <p id="meta-line" class="muted">正在等待工具结果…</p>
+          </div>
+          <div id="period-grid" class="period-grid"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2 id="summary-title">概览</h2>
+            <p id="range-line" class="muted"></p>
+          </div>
+          <div id="metrics-grid" class="metrics-grid"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>成本换算</h2>
+            <p class="muted">同一批 token 在不同 API 价格档下的等价成本。</p>
+          </div>
+          <div id="cost-grid" class="cost-grid"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>趋势</h2>
+            <p class="muted">最近 30 天与全历史按月趋势。</p>
+          </div>
+          <div class="charts">
+            <div class="chart-box">
+              <div class="label">最近 30 天</div>
+              <div id="daily-chart"></div>
+            </div>
+            <div class="chart-box">
+              <div class="label">月份趋势</div>
+              <div id="monthly-chart"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <h2>Top Sessions</h2>
+            <p class="muted">当前所选时间范围内最耗 token 的会话。</p>
+          </div>
+          <div id="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>总 token</th>
+                  <th>缓存占比</th>
+                  <th>来源</th>
+                </tr>
+              </thead>
+              <tbody id="sessions-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const DEFAULT_PERIOD = "this-month";
+      const numberFormat = new Intl.NumberFormat("zh-CN");
+      const state = {
+        payload: null,
+        selectedPeriod: DEFAULT_PERIOD,
+        refreshPending: false,
+      };
+
+      function formatInt(value) {
+        return numberFormat.format(value || 0);
+      }
+
+      function formatPct(value) {
+        if (value === null || value === undefined) {
+          return "—";
+        }
+        return `${Number(value).toFixed(2)}%`;
+      }
+
+      function formatUsd(cost) {
+        if (!cost) {
+          return "—";
+        }
+        const amount = Number(cost.total_cost || 0).toLocaleString("zh-CN", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        return `${amount} ${cost.currency}`;
+      }
+
+      function formatTime(value) {
+        if (!value) {
+          return "—";
+        }
+        try {
+          return new Date(value).toLocaleString("zh-CN");
+        } catch {
+          return value;
+        }
+      }
+
+      function setTheme(theme) {
+        document.documentElement.setAttribute("data-theme", theme === "light" ? "light" : "dark");
+      }
+
+      function persistWidgetState() {
+        if (window.openai && typeof window.openai.setWidgetState === "function") {
+          window.openai.setWidgetState({ selectedPeriod: state.selectedPeriod }).catch(() => {});
+        }
+      }
+
+      function applyPayload(payload) {
+        if (!payload || !payload.periods) {
+          return;
+        }
+        state.payload = payload;
+        const widgetState = window.openai && window.openai.widgetState;
+        if (widgetState && widgetState.selectedPeriod && payload.periods[widgetState.selectedPeriod]) {
+          state.selectedPeriod = widgetState.selectedPeriod;
+        } else if (!payload.periods[state.selectedPeriod]) {
+          state.selectedPeriod = DEFAULT_PERIOD;
+        }
+        render();
+      }
+
+      function render() {
+        if (!state.payload) {
+          document.getElementById("meta-line").textContent = "正在等待工具结果…";
+          return;
+        }
+        renderMeta();
+        renderPeriods();
+        renderMetrics();
+        renderCosts();
+        renderBars("daily-chart", state.payload.charts.daily_last_30, "day", false);
+        renderBars("monthly-chart", state.payload.charts.monthly, "month", true);
+        renderSessions();
+      }
+
+      function renderMeta() {
+        const meta = state.payload.meta;
+        document.getElementById("meta-line").textContent =
+          `最近刷新 ${formatTime(meta.generated_at)} · 已解析 ${formatInt(meta.record_count)} 个会话 · 本地日志口径`;
+      }
+
+      function renderPeriods() {
+        const grid = document.getElementById("period-grid");
+        grid.innerHTML = "";
+        Object.values(state.payload.periods).forEach((period) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `card period-card ${period.key === state.selectedPeriod ? "active" : ""}`;
+          button.innerHTML = `
+            <div class="label">${period.display_name}</div>
+            <div class="value">${formatInt(period.summary.total_tokens)}</div>
+            <div class="detail">${formatUsd(period.cost_estimate)} · ${formatPct(period.summary.cached_input_ratio_pct)}</div>
+          `;
+          button.addEventListener("click", () => {
+            state.selectedPeriod = period.key;
+            persistWidgetState();
+            render();
+          });
+          grid.appendChild(button);
+        });
+      }
+
+      function renderMetrics() {
+        const period = state.payload.periods[state.selectedPeriod];
+        const summary = period.summary;
+        document.getElementById("summary-title").textContent = `${period.display_name}概览`;
+        document.getElementById("range-line").textContent =
+          `${period.range_start || "起始未限制"} - ${period.range_end || "至今"}`;
+
+        const metrics = [
+          ["总 token", formatInt(summary.total_tokens), formatUsd(period.cost_estimate)],
+          ["会话数", formatInt(summary.session_count), `Top sessions ${period.top_sessions.length}`],
+          ["输入 token", formatInt(summary.input_tokens), `缓存 ${formatInt(summary.cached_input_tokens)}`],
+          ["非缓存输入", formatInt(summary.non_cached_input_tokens), "更接近真实新增输入"],
+          ["输出 token", formatInt(summary.output_tokens), `reasoning ${formatInt(summary.reasoning_output_tokens)}`],
+          ["缓存占比", formatPct(summary.cached_input_ratio_pct), "上下文复用强度"],
+        ];
+
+        const grid = document.getElementById("metrics-grid");
+        grid.innerHTML = "";
+        metrics.forEach(([label, value, detail]) => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <div class="label">${label}</div>
+            <div class="value">${value}</div>
+            <div class="detail">${detail}</div>
+          `;
+          grid.appendChild(div);
+        });
+      }
+
+      function renderCosts() {
+        const period = state.payload.periods[state.selectedPeriod];
+        const grid = document.getElementById("cost-grid");
+        grid.innerHTML = "";
+        Object.values(period.cost_comparison).forEach((cost) => {
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <div class="label">${cost.display_name}</div>
+            <div class="value">${formatUsd(cost)}</div>
+            <div class="detail">输入 ${cost.input_cost} / 缓存 ${cost.cached_input_cost} / 输出 ${cost.output_cost}</div>
+          `;
+          grid.appendChild(div);
+        });
+      }
+
+      function renderBars(containerId, rows, key, warn) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+        if (!rows || !rows.length) {
+          container.innerHTML = '<div class="status">没有可显示的数据</div>';
+          return;
+        }
+        const max = Math.max(...rows.map((row) => row.total_tokens), 1);
+        const bars = document.createElement("div");
+        bars.className = "bars";
+        rows.forEach((row) => {
+          const item = document.createElement("div");
+          item.className = "bar-item";
+          item.title = `${row[key]}: ${formatInt(row.total_tokens)}`;
+          const bar = document.createElement("div");
+          bar.className = `bar ${warn ? "warn" : ""}`;
+          bar.style.height = `${Math.max((row.total_tokens / max) * 150, 4)}px`;
+          const label = document.createElement("div");
+          label.className = "bar-label";
+          label.textContent = row[key];
+          item.appendChild(bar);
+          item.appendChild(label);
+          bars.appendChild(item);
+        });
+        container.appendChild(bars);
+      }
+
+      function renderSessions() {
+        const body = document.getElementById("sessions-body");
+        body.innerHTML = "";
+        const period = state.payload.periods[state.selectedPeriod];
+        if (!period.top_sessions.length) {
+          body.innerHTML = '<tr><td colspan="4" class="empty">这个时间范围内没有会话数据。</td></tr>';
+          return;
+        }
+        period.top_sessions.forEach((session) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${formatTime(session.session_timestamp)}<span class="sub">${session.plan_type || "unknown"}</span></td>
+            <td>${formatInt(session.total_tokens)}</td>
+            <td>${formatPct(session.cached_input_ratio_pct)}</td>
+            <td>${session.source}</td>
+          `;
+          body.appendChild(row);
+        });
+      }
+
+      async function refreshDashboard(force) {
+        if (!window.openai || typeof window.openai.callTool !== "function" || state.refreshPending) {
+          return;
+        }
+        state.refreshPending = true;
+        document.getElementById("meta-line").textContent = "正在刷新本地日志数据…";
+        try {
+          const result = await window.openai.callTool("show_usage_dashboard", {
+            top_sessions: state.payload?.meta?.default_top_sessions || 8,
+            force_refresh: Boolean(force),
+          });
+          if (result && result.structuredContent) {
+            applyPayload(result.structuredContent);
+          }
+        } catch (error) {
+          document.getElementById("meta-line").textContent = `刷新失败: ${error?.message || error}`;
+        } finally {
+          state.refreshPending = false;
+        }
+      }
+
+      function tryFullscreen() {
+        if (window.openai && typeof window.openai.requestDisplayMode === "function") {
+          window.openai.requestDisplayMode({ mode: "fullscreen" }).catch(() => {});
+        }
+      }
+
+      function handleGlobals(globals) {
+        if (!globals) {
+          return;
+        }
+        if (globals.theme) {
+          setTheme(globals.theme);
+        }
+        if (globals.widgetState && globals.widgetState.selectedPeriod && state.payload && state.payload.periods[globals.widgetState.selectedPeriod]) {
+          state.selectedPeriod = globals.widgetState.selectedPeriod;
+          render();
+        }
+        if (globals.toolOutput && globals.toolOutput.periods) {
+          applyPayload(globals.toolOutput);
+        }
+      }
+
+      window.addEventListener("openai:set_globals", (event) => {
+        handleGlobals(event.detail && event.detail.globals);
+      });
+
+      document.getElementById("refresh-button").addEventListener("click", () => {
+        refreshDashboard(true);
+      });
+      document.getElementById("fullscreen-button").addEventListener("click", () => {
+        tryFullscreen();
+      });
+
+      function boot() {
+        if (window.openai) {
+          setTheme(window.openai.theme);
+          handleGlobals({
+            toolOutput: window.openai.toolOutput,
+            widgetState: window.openai.widgetState,
+            theme: window.openai.theme,
+          });
+        }
+      }
+
+      let checks = 0;
+      const intervalId = window.setInterval(() => {
+        checks += 1;
+        boot();
+        if (window.openai || checks >= 40) {
+          window.clearInterval(intervalId);
+        }
+      }, 250);
+      boot();
+    </script>
+  </body>
+</html>
+

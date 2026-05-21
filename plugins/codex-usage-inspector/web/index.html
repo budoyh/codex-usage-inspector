@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codex Usage Inspector</title>
+    <link rel="stylesheet" href="./app.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Codex Usage Inspector</p>
+          <h1>本地 token 用量仪表盘</h1>
+          <p class="subhead">
+            基于本地 Codex 日志汇总，不等同于官方账单。支持缓存输入占比、时间趋势、Top sessions 和 API 等价成本换算。
+          </p>
+        </div>
+        <div class="toolbar">
+          <label class="field">
+            <span>价格档</span>
+            <select id="price-profile"></select>
+          </label>
+          <button id="refresh-button" type="button">刷新</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>时间范围</h2>
+          <p id="meta-line" class="muted"></p>
+        </div>
+        <div id="period-grid" class="period-grid"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2 id="summary-title">概览</h2>
+          <p id="range-line" class="muted"></p>
+        </div>
+        <div id="metrics-grid" class="metrics-grid"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>成本换算</h2>
+          <p class="muted">同一批 token 在不同 API 价格档下的等价成本。</p>
+        </div>
+        <div id="cost-grid" class="cost-grid"></div>
+      </section>
+
+      <section class="section charts">
+        <div class="chart-panel">
+          <div class="section-head">
+            <h2>最近 30 天</h2>
+            <p class="muted">按天汇总总 token</p>
+          </div>
+          <div id="daily-chart" class="bar-chart"></div>
+        </div>
+        <div class="chart-panel">
+          <div class="section-head">
+            <h2>月份趋势</h2>
+            <p class="muted">全历史按月汇总</p>
+          </div>
+          <div id="monthly-chart" class="bar-chart"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2>Top Sessions</h2>
+          <p class="muted">当前所选时间范围内最耗 token 的会话。</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>总 token</th>
+                <th>缓存占比</th>
+                <th>成本</th>
+                <th>来源</th>
+              </tr>
+            </thead>
+            <tbody id="sessions-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+

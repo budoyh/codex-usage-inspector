@@ -1,0 +1,20 @@
+{
+  "name": "budoyh-local",
+  "interface": {
+    "displayName": "budoyh local plugins"
+  },
+  "plugins": [
+    {
+      "name": "codex-usage-inspector",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-usage-inspector"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
