@@ -26,8 +26,8 @@ from usage_core import (
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 WIDGET_TEMPLATE_PATH = PLUGIN_ROOT / "assets" / "usage-widget.html"
-WIDGET_TEMPLATE_URI = "ui://widget/codex-usage-inspector.html"
-WIDGET_MIME_TYPE = "text/html+skybridge"
+WIDGET_TEMPLATE_URI = "ui://widget/codex-usage-inspector-v2.html"
+WIDGET_MIME_TYPE = "text/html;profile=mcp-app"
 DEFAULT_TOP_SESSIONS = 8
 DEFAULT_CACHE_TTL_SECONDS = 300
 WIDGET_DESCRIPTION = (
@@ -61,8 +61,35 @@ def load_widget_html() -> str:
 
 def widget_resource_meta() -> dict[str, object]:
     return {
+        "ui": {
+            "prefersBorder": True,
+            "csp": {
+                "connectDomains": [],
+                "resourceDomains": [],
+            },
+        },
         "openai/widgetDescription": WIDGET_DESCRIPTION,
     }
+
+
+def widget_resource() -> types.Resource:
+    return types.Resource(
+        name="Codex Usage Inspector widget",
+        title="Codex Usage Inspector widget",
+        uri=WIDGET_TEMPLATE_URI,
+        description=WIDGET_DESCRIPTION,
+        mimeType=WIDGET_MIME_TYPE,
+        _meta=widget_resource_meta(),
+    )
+
+
+def widget_contents() -> types.TextResourceContents:
+    return types.TextResourceContents(
+        uri=WIDGET_TEMPLATE_URI,
+        mimeType=WIDGET_MIME_TYPE,
+        text=load_widget_html(),
+        _meta=widget_resource_meta(),
+    )
 
 
 def render_tool_meta(invocation: str) -> dict[str, object]:
@@ -190,16 +217,26 @@ mcp = FastMCP(
 )
 
 
-@mcp.resource(
-    WIDGET_TEMPLATE_URI,
-    name="Codex Usage Inspector widget",
-    title="Codex Usage Inspector widget",
-    description=WIDGET_DESCRIPTION,
-    mime_type=WIDGET_MIME_TYPE,
-    meta=widget_resource_meta(),
-)
-async def usage_widget_template() -> str:
-    return load_widget_html()
+@mcp._mcp_server.list_resources()
+async def _list_resources() -> list[types.Resource]:
+    return [widget_resource()]
+
+
+async def _handle_read_resource(req: types.ReadResourceRequest) -> types.ServerResult:
+    if str(req.params.uri) != WIDGET_TEMPLATE_URI:
+        return types.ServerResult(
+            types.ReadResourceResult(
+                contents=[],
+                _meta={"error": f"Unknown resource: {req.params.uri}"},
+            )
+        )
+
+    return types.ServerResult(
+        types.ReadResourceResult(contents=[widget_contents()])
+    )
+
+
+mcp._mcp_server.request_handlers[types.ReadResourceRequest] = _handle_read_resource
 
 
 @mcp.tool(
